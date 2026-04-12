@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jarvis.agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/raulsgomez/Programacion/Programs/JARVIS/venv/bin/python</string>
+        <string>/Users/raulsgomez/Programacion/Programs/JARVIS/main.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/raulsgomez/Programacion/Programs/JARVIS</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+        <!-- Los secrets vienen del Keychain de macOS en tiempo de ejecución -->
+    </dict>
+
+    <!-- Mantener activo siempre, reiniciar si se cae -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Arrancar al inicio de sesión -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Logs -->
+    <key>StandardOutPath</key>
+    <string>/Users/raulsgomez/Programacion/Programs/JARVIS/logs/jarvis.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/raulsgomez/Programacion/Programs/JARVIS/logs/jarvis.stderr.log</string>
+
+    <!-- Esperar 30s antes de reintentar si se cae -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <!-- Timeout para apagado limpio -->
+    <key>ExitTimeout</key>
+    <integer>10</integer>
+</dict>
+</plist>

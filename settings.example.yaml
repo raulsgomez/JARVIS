@@ -1,0 +1,89 @@
+# JARVIS — configuración no-secreta
+# Copia este archivo como settings.yaml y ajusta los valores a tu entorno.
+# Los secrets (API keys, tokens) van en macOS Keychain o en el archivo .env.
+# Los IDs personales (Telegram, LinkedIn, Tailscale IP) van en .env.
+
+# LM Studio — API compatible con OpenAI en localhost:1234
+# Los modelos se descargan desde LM Studio y se cargan desde la UI.
+# El model_id debe coincidir con el "Model ID" que muestra LM Studio en Local Server.
+lm_studio:
+  base_url: "http://localhost:1234/v1"
+  main_model: "qwen/qwen3.5-9b"        # Instrucción general: chat, linkedin, news, calendar
+  router_model: "phi-3.5-mini-instruct" # Ligero para routing (fast-path lo evita en la mayoría de casos)
+  embedding_model: "text-embedding-nomic-embed-text-v1.5"
+  timeout: 300
+  api_key: "lm-studio"                     # LM Studio no valida la key, pero la lib la exige
+
+# Cloud LLM (solo para LinkedIn posts y contenido creativo)
+cloud:
+  model: "claude-haiku-4-5-20251001"
+
+# Telegram
+# Deja allowed_user_ids vacío aquí — configúralo via JARVIS_TELEGRAM_ALLOWED_USER_IDS en .env
+telegram:
+  allowed_user_ids: []
+
+# Scheduling (timezone: Europe/Madrid)
+schedule:
+  timezone: "Europe/Madrid"
+  news_digest_hour: 8
+  news_digest_minute: 0
+  linkedin_post_day: "tue"
+  linkedin_post_hour: 10
+  backup_hour: 2
+
+# News
+news:
+  rss_feeds:
+    - "https://feeds.bbci.co.uk/news/rss.xml"
+    - "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+    - "https://news.google.com/rss?hl=es&gl=ES&ceid=ES:es"
+  max_articles_per_feed: 5
+
+# LinkedIn
+# Deja person_id vacío aquí — configúralo via JARVIS_LINKEDIN_PERSON_ID en .env
+linkedin:
+  person_id: ""
+
+# CalDAV (Apple Calendar)
+# Deja username vacío aquí — configúralo via JARVIS_CALDAV_USERNAME en .env
+caldav:
+  url: "https://caldav.icloud.com"
+  username: ""
+
+# iCloud Photos backup
+backup:
+  output_dir: "~/Pictures/JARVIS-Backup"
+  days_back: 1
+
+# Pricing — USD por 1.000.000 tokens
+# Actualizar aquí sin tocar código
+pricing:
+  claude-haiku-4-5-20251001:
+    input: 1.00
+    output: 5.00
+  claude-sonnet-4-6-20250514:
+    input: 3.00
+    output: 15.00
+  gemini-2.5-flash:
+    input: 0.15
+    output: 0.60
+  qwen/qwen3.5-9b:
+    input: 0.0
+    output: 0.0
+  microsoft/phi-4-mini-reasoning:
+    input: 0.0
+    output: 0.0
+  phi-3.5-mini-instruct:
+    input: 0.0
+    output: 0.0
+  text-embedding-nomic-embed-text-v1.5:
+    input: 0.0
+    output: 0.0
+
+# Web gallery
+web:
+  port: 8080
+  host: "0.0.0.0"
+  thumbs_dir: "~/Pictures/JARVIS-Thumbs"
+  # tailscale_ip se configura via JARVIS_WEB_TAILSCALE_IP en .env

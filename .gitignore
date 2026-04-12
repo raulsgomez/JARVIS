@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Data & runtime
+data/
+logs/
+
+# Secrets & personal config
+.env
+settings.yaml
+
+# Certificados y claves
+*.pem
+*.key
+*.p12
+
+# Google OAuth credentials
+google_credentials.json
+google_token.json
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code local settings
+.claude/

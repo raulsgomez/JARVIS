@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS Gallery</title>
+
+<!-- Leaflet CSS (local) -->
+<link rel="stylesheet" href="/static/lib/leaflet.css"/>
+<link rel="stylesheet" href="/static/lib/MarkerCluster.css"/>
+<link rel="stylesheet" href="/static/lib/MarkerCluster.Default.css"/>
+
+<style>
+:root {
+  --bg: #0a0a0a; --surface: #161616; --border: #2a2a2a;
+  --text: #e8e8e8; --muted: #888;
+  --accent: #4f8ef7; --accent-hover: #6ba3ff;
+  --danger: #e05252; --gap: 3px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  display: flex; flex-direction: column; height: 100dvh;
+}
+
+/* Header */
+header { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.logo { font-weight: 700; font-size: 16px; color: var(--accent); white-space: nowrap; }
+.stats-bar { color: var(--muted); font-size: 12px; flex: 1; display: flex; gap: 12px; flex-wrap: wrap; }
+.view-toggle { display: flex; gap: 4px; }
+.view-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; transition: all .15s; }
+.view-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Filters */
+.filters { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-label { color: var(--muted); font-size: 12px; }
+select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 13px; cursor: pointer; }
+select:focus { outline: none; border-color: var(--accent); }
+.toggle-btn { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; transition: all .15s; white-space: nowrap; }
+.toggle-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.filter-sep { color: var(--border); }
+.clear-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--danger); cursor: pointer; font-size: 12px; margin-left: auto; }
+.clear-btn:hover { background: var(--danger); color: #fff; }
+
+/* Grid */
+#grid-view { padding: var(--gap); }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--gap); }
+.photo-card { position: relative; aspect-ratio: 1; overflow: hidden; background: var(--surface); cursor: pointer; border-radius: 2px; }
+.photo-card img { width: 100%; height: 100%; object-fit: cover; transition: transform .2s; }
+.photo-card:hover img { transform: scale(1.05); }
+.photo-card .date-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.75)); color: #fff; font-size: 10px; padding: 16px 4px 4px; opacity: 0; transition: opacity .2s; }
+.photo-card:hover .date-overlay { opacity: 1; }
+.badges { position: absolute; top: 4px; right: 4px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.badge { font-size: 11px; padding: 1px 4px; border-radius: 3px; background: rgba(0,0,0,.6); color: #fff; line-height: 1.4; }
+.no-thumb { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--muted); }
+.no-thumb span { font-size: 28px; }
+.no-thumb small { font-size: 10px; text-align: center; padding: 0 4px; word-break: break-all; }
+
+/* Pagination */
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 20px; color: var(--muted); }
+.page-btn { padding: 8px 18px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 13px; }
+.page-btn:disabled { opacity: .3; cursor: default; }
+.page-btn:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
+
+/* Layout flexible para que mapa y grid ocupen el espacio restante */
+header { flex-shrink: 0; }
+.filters { flex-shrink: 0; }
+#grid-view { flex: 1; overflow-y: auto; min-height: 0; }
+#map-view { flex: 1; min-height: 0; }
+
+/* Map */
+#map-view { display: none; }
+#map { height: 100%; width: 100%; min-height: 300px; }
+
+/* Lightbox */
+.lightbox { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.92); align-items: center; justify-content: center; }
+.lightbox.open { display: flex; }
+.lb-content { position: relative; max-width: 94vw; max-height: 94vh; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.lb-media { max-width: 90vw; max-height: 78vh; object-fit: contain; border-radius: 4px; }
+video.lb-media { background: #000; }
+.lb-nav { position: absolute; top: 45%; transform: translateY(-50%); display: flex; justify-content: space-between; width: calc(100% + 100px); left: -50px; pointer-events: none; }
+.lb-arrow { pointer-events: all; background: rgba(0,0,0,.5); border: none; color: #fff; font-size: 28px; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+.lb-arrow:hover { background: rgba(79,142,247,.7); }
+.lb-meta { text-align: center; color: var(--muted); font-size: 12px; display: flex; flex-direction: column; gap: 3px; max-width: 560px; }
+.lb-title { color: var(--text); font-size: 14px; font-weight: 500; }
+.lb-meta-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.lb-actions { display: flex; gap: 10px; }
+.lb-btn { padding: 7px 16px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+.lb-btn:hover { border-color: var(--accent); color: var(--accent); }
+.lb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.lb-btn.primary:hover { background: var(--accent-hover); }
+.lb-close { position: absolute; top: -14px; right: -14px; background: rgba(0,0,0,.6); border: 1px solid var(--border); color: var(--text); font-size: 18px; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.lb-close:hover { background: var(--danger); border-color: var(--danger); }
+
+/* Spinner */
+.spinner { display: flex; align-items: center; justify-content: center; padding: 60px; color: var(--muted); font-size: 13px; gap: 10px; }
+
+/* Map popup */
+.map-popup img { width: 110px; height: 110px; object-fit: cover; cursor: pointer; border-radius: 4px; display: block; }
+.map-popup p { font-size: 11px; color: #555; margin-top: 4px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📸 JARVIS Gallery</div>
+  <div class="stats-bar" id="stats-bar"><span>Cargando...</span></div>
+  <div class="view-toggle">
+    <button class="view-btn active" id="btn-grid" onclick="switchView('grid')">⊞ Grid</button>
+    <button class="view-btn" id="btn-map" onclick="switchView('map')">🗺 Mapa</button>
+  </div>
+</header>
+
+<div class="filters">
+  <span class="filter-label">Filtros:</span>
+  <select id="f-year" onchange="applyFilters()"><option value="">Año</option></select>
+  <select id="f-month" onchange="applyFilters()">
+    <option value="">Mes</option>
+    <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+    <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+    <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+    <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+  </select>
+  <span class="filter-sep">|</span>
+  <button class="toggle-btn" id="f-fav" onclick="toggleFilter('fav')">⭐ Favoritos</button>
+  <button class="toggle-btn" id="f-video" onclick="toggleFilter('video')">🎬 Vídeos</button>
+  <span class="filter-sep">|</span>
+  <select id="f-type" onchange="applyFilters()">
+    <option value="">Tipo</option>
+    <option value="portrait">👤 Portrait</option><option value="selfie">🤳 Selfie</option>
+    <option value="hdr">✨ HDR</option><option value="panorama">🌅 Panorama</option>
+    <option value="screenshot">📱 Screenshot</option><option value="live">⚡ Live</option>
+    <option value="slow_mo">🐌 Slow Mo</option><option value="time_lapse">⏩ Time-lapse</option>
+  </select>
+  <select id="f-person" onchange="applyFilters()"><option value="">Persona</option></select>
+  <select id="f-album" onchange="applyFilters()"><option value="">Álbum</option></select>
+  <button class="clear-btn" onclick="clearFilters()">✕ Limpiar</button>
+</div>
+
+<!-- Grid -->
+<div id="grid-view" style="display:block">
+  <div class="photo-grid" id="grid"></div>
+  <div id="spinner" class="spinner">⏳ Cargando fotos...</div>
+  <div class="pagination" id="pagination" style="display:none">
+    <button class="page-btn" id="btn-prev" onclick="changePage(-1)">← Anterior</button>
+    <span id="page-info"></span>
+    <button class="page-btn" id="btn-next" onclick="changePage(1)">Siguiente →</button>
+  </div>
+</div>
+
+<!-- Mapa -->
+<div id="map-view"><div id="map"></div></div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightboxOnBg(event)">
+  <div class="lb-content" id="lb-content">
+    <button class="lb-close" onclick="closeLightbox()">✕</button>
+    <div class="lb-nav">
+      <button class="lb-arrow" onclick="navigateLightbox(-1)">‹</button>
+      <button class="lb-arrow" onclick="navigateLightbox(1)">›</button>
+    </div>
+    <img class="lb-media" id="lb-img" src="" alt="" style="display:none"/>
+    <video class="lb-media" id="lb-video" controls style="display:none"></video>
+    <div class="lb-meta">
+      <div class="lb-title" id="lb-title"></div>
+      <div class="lb-meta-row" id="lb-meta-row"></div>
+    </div>
+    <div class="lb-actions">
+      <a class="lb-btn primary" id="lb-download" href="#">⬇ Descargar original</a>
+      <button class="lb-btn" onclick="closeLightbox()">✕ Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/lib/leaflet.js"></script>
+<script src="/static/lib/markercluster.js"></script>
+<script>
+// Decirle a Leaflet dónde están los marker icons (servidos localmente)
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl:       '/static/lib/marker-icon.png',
+  iconRetinaUrl: '/static/lib/marker-icon-2x.png',
+  shadowUrl:     '/static/lib/marker-shadow.png',
+});
+</script>
+<script>
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+const API = (path, params = {}) => {
+  const u = new URL(path, location.origin);
+  if (TOKEN) u.searchParams.set('token', TOKEN);
+  Object.entries(params).forEach(([k,v]) => { if (v !== null && v !== '' && v !== undefined) u.searchParams.set(k, v); });
+  return u.toString();
+};
+
+let currentPage = 1, currentItems = [], totalPages = 1;
+let currentView = 'grid', mapLoaded = false, mapInstance = null;
+const filters = { year:'', month:'', fav:false, video:false, type:'', person:'', album:'' };
+
+// ── Init ────────────────────────────────────────────────────────────────────
+(async () => {
+  await Promise.all([loadStats(), populateYears(), loadPeople(), loadAlbums()]);
+  loadPhotos();
+})();
+
+async function apiFetch(url) {
+  const r = await fetch(url);
+  if (r.status === 401) {
+    document.body.innerHTML = '<div style="padding:40px;color:#e05252;font-size:16px">🔒 Token inválido. Añade ?token=TU_TOKEN a la URL.</div>';
+    throw new Error('Unauthorized');
+  }
+  return r.json();
+}
+
+async function loadStats() {
+  try {
+    const s = await apiFetch(API('/api/stats'));
+    const mb = s.total_size_bytes ? (s.total_size_bytes/1e6).toFixed(0)+' MB' : '—';
+    document.getElementById('stats-bar').innerHTML =
+      `<span>📷 ${s.total_photos.toLocaleString()} fotos</span>` +
+      `<span>🎬 ${(s.videos||0).toLocaleString()} vídeos</span>` +
+      `<span>⭐ ${(s.favorites||0).toLocaleString()} favoritas</span>` +
+      `<span>📍 ${(s.with_gps||0).toLocaleString()} con GPS</span>` +
+      `<span>💾 ${mb}</span>`;
+  } catch(e) {}
+}
+
+function populateYears() {
+  const sel = document.getElementById('f-year');
+  for (let y = new Date().getFullYear(); y >= 2000; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y; sel.appendChild(o);
+  }
+}
+
+async function loadPeople() {
+  try {
+    const people = await apiFetch(API('/api/photos/people'));
+    const sel = document.getElementById('f-person');
+    people.forEach(p => { const o = document.createElement('option'); o.value=p; o.textContent=p; sel.appendChild(o); });
+  } catch(e) {}
+}
+
+async function loadAlbums() {
+  try {
+    const albums = await apiFetch(API('/api/photos/albums'));
+    const sel = document.getElementById('f-album');
+    albums.forEach(a => { const o = document.createElement('option'); o.value=a; o.textContent=a.length>32?a.slice(0,30)+'…':a; sel.appendChild(o); });
+  } catch(e) {}
+}
+
+// ── Filtros ─────────────────────────────────────────────────────────────────
+function toggleFilter(key) {
+  if (key==='fav') { filters.fav=!filters.fav; document.getElementById('f-fav').classList.toggle('active',filters.fav); }
+  else if (key==='video') { filters.video=!filters.video; document.getElementById('f-video').classList.toggle('active',filters.video); }
+  currentPage=1; loadPhotos();
+}
+function applyFilters() {
+  filters.year=document.getElementById('f-year').value;
+  filters.month=document.getElementById('f-month').value;
+  filters.type=document.getElementById('f-type').value;
+  filters.person=document.getElementById('f-person').value;
+  filters.album=document.getElementById('f-album').value;
+  currentPage=1; loadPhotos();
+}
+function clearFilters() {
+  Object.assign(filters, {year:'',month:'',fav:false,video:false,type:'',person:'',album:''});
+  ['f-year','f-month','f-type','f-person','f-album'].forEach(id => document.getElementById(id).value='');
+  ['f-fav','f-video'].forEach(id => document.getElementById(id).classList.remove('active'));
+  currentPage=1; loadPhotos();
+}
+
+// ── Cargar fotos ─────────────────────────────────────────────────────────────
+async function loadPhotos() {
+  const grid = document.getElementById('grid');
+  document.getElementById('spinner').style.display='flex';
+  document.getElementById('pagination').style.display='none';
+  grid.innerHTML='';
+  try {
+    const data = await apiFetch(API('/api/photos', {
+      page:currentPage, page_size:60,
+      year:filters.year, month:filters.month,
+      favorite:filters.fav?'1':'',
+      is_video:filters.video?'1':'',
+      type:filters.type, person:filters.person, album:filters.album,
+    }));
+    currentItems=data.items; totalPages=data.pages;
+    document.getElementById('spinner').style.display='none';
+    if (!data.items.length) { grid.innerHTML='<div class="spinner">📭 Sin resultados</div>'; return; }
+    data.items.forEach((p,i) => renderCard(p,i));
+    renderPagination(data.page, data.pages, data.total);
+  } catch(e) {
+    document.getElementById('spinner').style.display='none';
+    if (e.message!=='Unauthorized') grid.innerHTML=`<div class="spinner" style="color:#e05252">Error: ${e.message}</div>`;
+  }
+}
+
+function renderCard(photo, idx) {
+  const date = `${photo.year}-${String(photo.month).padStart(2,'0')}-${String(photo.day).padStart(2,'0')}`;
+  const div = document.createElement('div');
+  div.className='photo-card'; div.onclick=()=>openLightbox(idx);
+  const badges=[];
+  if (photo.is_video) badges.push('🎬');
+  if (photo.is_favorite) badges.push('⭐');
+  if (photo.photo_type==='portrait') badges.push('👤');
+  else if (photo.photo_type==='selfie') badges.push('🤳');
+  else if (photo.photo_type==='panorama') badges.push('🌅');
+  else if (photo.photo_type==='hdr') badges.push('✨');
+  else if (photo.photo_type==='screenshot') badges.push('📱');
+  if (photo.lat) badges.push('📍');
+  const badgesHtml = badges.length ? `<div class="badges">${badges.map(b=>`<span class="badge">${b}</span>`).join('')}</div>` : '';
+  if (photo.has_thumb && !photo.is_video) {
+    div.innerHTML=`<img src="${API(`/api/photos/${photo.id}/thumb`)}" loading="lazy" decoding="async" alt="${photo.filename}"/><div class="date-overlay">${date}</div>${badgesHtml}`;
+  } else {
+    div.innerHTML=`<div class="no-thumb"><span>${photo.is_video?'🎬':'🖼'}</span><small>${photo.filename}</small><small style="color:var(--muted)">${date}</small></div>${badgesHtml}`;
+  }
+  document.getElementById('grid').appendChild(div);
+}
+
+function renderPagination(page, pages, total) {
+  document.getElementById('pagination').style.display='flex';
+  document.getElementById('page-info').textContent=`Página ${page} de ${pages} · ${total.toLocaleString()} fotos`;
+  document.getElementById('btn-prev').disabled=page<=1;
+  document.getElementById('btn-next').disabled=page>=pages;
+}
+function changePage(delta) { currentPage=Math.max(1,Math.min(totalPages,currentPage+delta)); loadPhotos(); window.scrollTo(0,0); }
+
+// ── Lightbox ─────────────────────────────────────────────────────────────────
+let lbIdx=0;
+function openLightbox(idx) { lbIdx=idx; renderLbPhoto(currentItems[idx]); document.getElementById('lightbox').classList.add('open'); document.body.style.overflow='hidden'; }
+function renderLbPhoto(photo) {
+  const img=document.getElementById('lb-img'), vid=document.getElementById('lb-video');
+  const originalUrl=API(`/api/photos/${photo.id}/original`);
+  const downloadUrl=API(`/api/photos/${photo.id}/original`,{download:'1'});
+  if (photo.is_video) {
+    img.style.display='none'; vid.style.display='block'; vid.src=originalUrl;
+  } else {
+    vid.style.display='none'; vid.src='';
+    img.style.display='block';
+    img.src = (photo.mime_type==='image/heic'||photo.mime_type==='image/heif')
+      ? API(`/api/photos/${photo.id}/thumb`)
+      : originalUrl;
+  }
+  document.getElementById('lb-title').textContent=photo.filename;
+  const dl=document.getElementById('lb-download');
+  dl.href=downloadUrl; dl.download=photo.filename;
+  const date=`${photo.year}-${String(photo.month).padStart(2,'0')}-${String(photo.day).padStart(2,'0')}`;
+  const meta=[];
+  meta.push(`📅 ${date}`);
+  if (photo.city||photo.country) meta.push(`📍 ${[photo.city,photo.country].filter(Boolean).join(', ')}`);
+  if (photo.size_bytes) meta.push(`💾 ${(photo.size_bytes/1e6).toFixed(1)} MB`);
+  if (photo.width&&photo.height) meta.push(`📐 ${photo.width}×${photo.height}`);
+  try { const p=JSON.parse(photo.persons||'[]'); if(p.length) meta.push(`👤 ${p.join(', ')}`); } catch(e){}
+  try { const a=JSON.parse(photo.albums||'[]'); if(a.length) meta.push(`📁 ${a[0]}`); } catch(e){}
+  if (photo.photo_type) { const types={portrait:'Portrait',selfie:'Selfie',hdr:'HDR',panorama:'Panorama',screenshot:'Screenshot',live:'Live',slow_mo:'Slow Mo',time_lapse:'Time-lapse'}; meta.push(types[photo.photo_type]||photo.photo_type); }
+  if (photo.is_favorite) meta.push('⭐ Favorita');
+  document.getElementById('lb-meta-row').innerHTML=meta.map(m=>`<span>${m}</span>`).join('');
+}
+function navigateLightbox(d) { const n=lbIdx+d; if(n<0||n>=currentItems.length) return; lbIdx=n; renderLbPhoto(currentItems[n]); }
+function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); document.getElementById('lb-video').pause?.(); document.getElementById('lb-video').src=''; document.body.style.overflow=''; }
+function closeLightboxOnBg(e) { if(e.target===document.getElementById('lightbox')) closeLightbox(); }
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('lightbox').classList.contains('open')) return;
+  if (e.key==='Escape') closeLightbox();
+  if (e.key==='ArrowLeft') navigateLightbox(-1);
+  if (e.key==='ArrowRight') navigateLightbox(1);
+});
+
+// ── Vistas ───────────────────────────────────────────────────────────────────
+function switchView(v) {
+  currentView=v;
+  document.getElementById('grid-view').style.display=v==='grid'?'block':'none';
+  document.getElementById('map-view').style.display=v==='map'?'block':'none';
+  document.getElementById('btn-grid').classList.toggle('active',v==='grid');
+  document.getElementById('btn-map').classList.toggle('active',v==='map');
+  if (v==='map'&&!mapLoaded) { mapLoaded=true; initMap(); }
+  if (v==='map'&&mapInstance) { setTimeout(()=>mapInstance.invalidateSize(),50); }
+}
+
+// ── Mapa ─────────────────────────────────────────────────────────────────────
+async function initMap() {
+  const el=document.getElementById('map');
+  el.innerHTML='<div class="spinner">🗺 Cargando puntos GPS...</div>';
+  let points;
+  try { points=await apiFetch(API('/api/photos/map')); } catch(e) { el.innerHTML=`<div class="spinner" style="color:#e05252">Error: ${e.message}</div>`; return; }
+  el.innerHTML='';
+  mapInstance=L.map('map').setView([40.4,-3.7],5);
+  // Forzar recalcular tamaño por si el contenedor no tenía dimensiones al inicializar
+  setTimeout(() => mapInstance.invalidateSize(), 100);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://openstreetmap.org">OpenStreetMap</a>',maxZoom:19}).addTo(mapInstance);
+  if (!points.length) {
+    const c=L.control({position:'topright'}); c.onAdd=()=>{ const d=L.DomUtil.create('div',''); d.style.cssText='background:white;padding:10px;border-radius:6px;font-size:13px'; d.innerHTML='📭 Sin fotos con GPS.<br>Haz /sync en Telegram.'; return d; }; c.addTo(mapInstance); return;
+  }
+  const cluster=L.markerClusterGroup({chunkedLoading:true,maxClusterRadius:50});
+  points.forEach(p=>{
+    const date=`${p.year}-${String(p.month).padStart(2,'0')}-${String(p.day).padStart(2,'0')}`;
+    const loc=p.city||p.country||'';
+    const m=L.marker([p.lat,p.lon]);
+    m.bindPopup(`<div class="map-popup"><img src="${API(`/api/photos/${p.id}/thumb`)}" onclick="openMapPhoto('${p.id}')" loading="lazy"/><p>${date}${loc?'<br>'+loc:''}</p></div>`,{maxWidth:150});
+    cluster.addLayer(m);
+  });
+  mapInstance.addLayer(cluster);
+  const lats=points.map(p=>p.lat), lons=points.map(p=>p.lon);
+  mapInstance.fitBounds([[Math.min(...lats),Math.min(...lons)],[Math.max(...lats),Math.max(...lons)]],{padding:[40,40]});
+  const info=L.control({position:'topright'}); info.onAdd=()=>{ const d=L.DomUtil.create('div',''); d.style.cssText='background:white;padding:8px 12px;border-radius:6px;font-size:12px;color:#333'; d.innerHTML=`📍 ${points.length.toLocaleString()} fotos con GPS`; return d; }; info.addTo(mapInstance);
+}
+
+function openMapPhoto(photoId) {
+  const idx=currentItems.findIndex(p=>p.id===photoId);
+  if (idx>=0) { switchView('grid'); openLightbox(idx); }
+}
+</script>
+</body>
+</html>
